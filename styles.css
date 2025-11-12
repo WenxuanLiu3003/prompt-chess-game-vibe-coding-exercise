@@ -137,3 +137,59 @@ tr.row-pinned {
   outline: 1px dashed var(--accent);
   outline-offset: -2px;
 }
+
+/* -- existing styles from your site (unchanged above) -- */
+/* ... (keep everything you already have) ... */
+
+/* ===== Model & Prompts ===== */
+.badge.model {
+  display: inline-block;
+  font-size: .78rem;
+  padding: .2rem .5rem;
+  border-radius: .4rem;
+  border: 1px solid var(--border);
+  color: var(--accent);
+  background: color-mix(in oklab, var(--card), var(--accent) 8%);
+}
+
+.prompt-blocks { display: grid; gap: .75rem; }
+.prompt-block {
+  border: 1px solid var(--border);
+  border-radius: .6rem;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--card), var(--text) 4%);
+}
+.prompt-block-title {
+  font-weight: 600;
+  padding: .55rem .75rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+}
+.prompt-pre {
+  margin: 0;
+  padding: .75rem;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: .9rem;
+}
+
+.prompt-meta { margin-top: 1rem; }
+.meta-kv { display: grid; grid-template-columns: max-content 1fr; gap: .35rem .8rem; }
+.meta-kv dt { color: var(--muted); }
+.meta-kv dd { margin: 0; }
+
+.msg-list { display: grid; gap: .5rem; padding: .5rem .75rem .9rem; }
+.msg {
+  border: 1px dashed var(--border);
+  border-radius: .5rem;
+  padding: .5rem .6rem;
+  background: color-mix(in oklab, var(--card), var(--text) 3%);
+}
+.msg-role {
+  font-size: .78rem; color: var(--muted); margin-bottom: .3rem;
+  text-transform: uppercase; letter-spacing: .03em;
+}
+.msg-content pre { margin: 0; }
+.muted { color: var(--muted); }
