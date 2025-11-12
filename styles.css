@@ -73,6 +73,17 @@ thead th {
 tbody td { padding: .6rem .75rem; border-bottom: 1px solid var(--border); }
 tbody tr:hover { background: color-mix(in oklab, var(--card), var(--text) 8%); }
 
+/* Truncate long text with ellipsis (full text lives in the title attribute) */
+.truncate {
+  max-width: 360px;       /* adjusts nicely on iPad; tweak as you like */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  .truncate { max-width: 220px; }
+}
+
 /* 🔆 highlight rules */
 tr.row-hl-top {
   position: relative;
