@@ -43,3 +43,19 @@ function navigateToPlayer(name) {
   u.searchParams.set('name', name);
   window.location.href = u.toString();
 }
+
+function esc(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function truncateText(s, n = 100) {
+  if (s == null) return '';
+  const str = String(s);
+  return str.length > n ? str.slice(0, n - 1) + '…' : str;
+}
