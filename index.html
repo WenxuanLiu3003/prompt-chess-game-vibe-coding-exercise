@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Prompt Game Tournament — Leaderboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Styles -->
+  <link rel="stylesheet" href="./styles.css" />
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<header class="site-header">
+  <h1>Prompt Game Tournament</h1>
+  <div class="header-actions">
+    <input id="searchInput" class="search" placeholder="Search player…" />
+    <button id="themeToggle" class="btn secondary" aria-label="Toggle theme">🌓</button>
+  </div>
+</header>
+
+<main class="container">
+  <section class="card">
+    <div class="card-header">
+      <h2>Leaderboard</h2>
+      <div class="toolbar">
+        <label class="sort-label">
+          Sort by:
+          <select id="sortSelect">
+            <option value="Rank">Rank (asc)</option>
+            <option value="-Win_Rate">Win Rate (desc)</option>
+            <option value="-Rating_Mu">Rating Mu (desc)</option>
+            <option value="-Games">Games (desc)</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="leaderboard">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Player</th>
+            <th>Rating μ</th>
+            <th>Rating σ</th>
+            <th>Wins</th>
+            <th>Draws</th>
+            <th>Losses</th>
+            <th>Games</th>
+            <th>Win Rate</th>
+          </tr>
+        </thead>
+        <tbody><!-- populated by JS --></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Win Rates</h2>
+      <canvas id="winRateChart"></canvas>
+    </div>
+    <div class="card">
+      <h2>Rating μ Distribution</h2>
+      <canvas id="ratingDistChart"></canvas>
+    </div>
+    <div class="card">
+      <h2>W / D / L Totals</h2>
+      <canvas id="wldChart"></canvas>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <p>
+    Data: <code>data/final_standings.csv</code> • 
+    <a href="https://github.com/TianyiPeng/prompt-chess-game-vibe-coding-exercise" target="_blank" rel="noopener">Repo</a>
+  </p>
+</footer>
+
+<script src="./utils.js"></script>
+<script src="./charts.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>
