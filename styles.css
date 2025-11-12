@@ -5,6 +5,10 @@
   --muted: #aeb4c0;
   --accent: #6ea8fe;
   --border: #1f2229;
+
+  /* highlight colors */
+  --hl-top: #f5c542;   /* gold */
+  --hl-win: #46c37b;   /* green */
 }
 :root.light {
   --bg: #f7f8fb;
@@ -13,6 +17,9 @@
   --muted: #475066;
   --accent: #315efb;
   --border: #e5e7ef;
+
+  --hl-top: #d39e00;
+  --hl-win: #1e7e34;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
@@ -66,6 +73,23 @@ thead th {
 tbody td { padding: .6rem .75rem; border-bottom: 1px solid var(--border); }
 tbody tr:hover { background: color-mix(in oklab, var(--card), var(--text) 8%); }
 
+/* 🔆 highlight rules */
+tr.row-hl-top {
+  position: relative;
+  background: color-mix(in oklab, var(--card), var(--hl-top) 10%);
+  border-left: 4px solid var(--hl-top);
+}
+tr.row-hl-win {
+  position: relative;
+  background: color-mix(in oklab, var(--card), var(--hl-win) 10%);
+  border-left: 4px solid var(--hl-win);
+}
+/* both conditions → slightly stronger */
+tr.row-hl-top.row-hl-win {
+  background: color-mix(in oklab, var(--card), var(--hl-top) 8%, var(--hl-win) 8%);
+  border-left: 4px solid color-mix(in oklab, var(--hl-top), var(--hl-win) 50%);
+}
+
 .btn { cursor: pointer; font-weight: 600; border-radius: .5rem; padding: .55rem .8rem; border: 1px solid var(--border); background: var(--card); color: var(--text); }
 .btn.secondary { background: transparent; }
 .btn.link { border: none; padding: 0; background: none; color: var(--accent); }
@@ -84,3 +108,16 @@ tbody tr:hover { background: color-mix(in oklab, var(--card), var(--text) 8%); }
 .kv li span { color: var(--muted); }
 
 h2 { margin: .25rem 0 .75rem; font-size: 1.1rem; }
+
+/* small badges next to player names */
+.badges { display: inline-flex; gap: .35rem; margin-left: .4rem; vertical-align: middle; }
+.badge {
+  display: inline-block;
+  font-size: .72rem;
+  padding: .15rem .4rem;
+  border-radius: .4rem;
+  border: 1px solid var(--border);
+  line-height: 1;
+}
+.badge.top3 { border-color: var(--hl-top); color: var(--hl-top); }
+.badge.highwr { border-color: var(--hl-win); color: var(--hl-win); }
