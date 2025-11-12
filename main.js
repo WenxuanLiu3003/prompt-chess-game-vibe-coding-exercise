@@ -11,7 +11,6 @@
   function savePins(arr) {
     localStorage.setItem(PIN_KEY, JSON.stringify(arr));
   }
-  // Keep an ordered list (pin order) + a fast Set
   let pinOrder = loadPins();
   let pinnedSet = new Set(pinOrder);
 
@@ -43,17 +42,23 @@
       if (isTop3)  badges.push('<span class="badge top3" title="Top 3">Top 3</span>');
       if (isHighWR) badges.push('<span class="badge highwr" title="Win Rate ≥ 80%">80%+</span>');
 
+      const modelText = esc(r.Model ?? '');
+      const promptFull = esc(r.Prompt ?? '');
+      const promptShown = esc(truncateText(r.Prompt ?? '', 120));
+
       const tr = document.createElement('tr');
       tr.className = classes;
       tr.innerHTML = `
         <td style="text-align:center;">
-          <button class="pin-btn ${isPinned ? 'active' : ''}" data-pin="${r.Player}" aria-pressed="${isPinned ? 'true' : 'false'}" title="${isPinned ? 'Unpin' : 'Pin'}">📌</button>
+          <button class="pin-btn ${isPinned ? 'active' : ''}" data-pin="${esc(r.Player)}" aria-pressed="${isPinned ? 'true' : 'false'}" title="${isPinned ? 'Unpin' : 'Pin'}">📌</button>
         </td>
         <td>${r.Rank}</td>
         <td>
-          <a class="btn link" href="#" data-player="${r.Player}">${r.Player}</a>
+          <a class="btn link" href="#" data-player="${esc(r.Player)}">${esc(r.Player)}</a>
           ${badges.length ? `<span class="badges">${badges.join('')}</span>` : ''}
         </td>
+        <td>${modelText || '—'}</td>
+        <td class="truncate" title="${promptFull}">${promptShown || '—'}</td>
         <td>${r.Rating_Mu}</td>
         <td>${r.Rating_Sigma}</td>
         <td>${r.Wins}</td>
@@ -65,6 +70,7 @@
       frag.appendChild(tr);
     });
     LB.appendChild(frag);
+    wireRowEvents();
   }
 
   function updateCharts(rows) {
@@ -79,29 +85,35 @@
     const sortKey = sortSelect.value;
     let rows = allRows.slice();
 
-    if (q) rows = rows.filter(r => String(r.Player).toLowerCase().includes(q));
+    // 🔎 search by Player + Model + Prompt
+    if (q) {
+      rows = rows.filter(r => {
+        const player = String(r.Player || '').toLowerCase();
+        const model  = String(r.Model  || '').toLowerCase();
+        const prompt = String(r.Prompt || '').toLowerCase();
+        return player.includes(q) || model.includes(q) || prompt.includes(q);
+      });
+    }
 
-    // Primary sort according to user selection
+    // primary sort
     rows.sort(byKey(sortKey));
 
-    // Then bring pinned players to the top in the order they were pinned
+    // pinned to the top in the order pinned
     if (pinOrder.length) {
       const pinIndex = new Map(pinOrder.map((name, i) => [name, i]));
       rows.sort((a, b) => {
         const aPinned = pinnedSet.has(String(a.Player));
         const bPinned = pinnedSet.has(String(b.Player));
         if (aPinned && bPinned) {
-          // Respect pin order
           return (pinIndex.get(String(a.Player)) ?? 0) - (pinIndex.get(String(b.Player)) ?? 0);
         }
         if (aPinned && !bPinned) return -1;
         if (!aPinned && bPinned) return 1;
-        return 0; // keep previous order
+        return 0;
       });
     }
 
     renderTable(rows);
-    wireRowEvents();  // attach events after render
     updateCharts(rows);
   }
 
@@ -112,13 +124,12 @@
       pinOrder = pinOrder.filter(x => x !== s);
     } else {
       pinnedSet.add(s);
-      pinOrder.push(s); // append to end to preserve recency order
+      pinOrder.push(s);
     }
     savePins(pinOrder);
   }
 
   function wireRowEvents() {
-    // Delegate all clicks within tbody (works on iPad)
     LB.onclick = (e) => {
       const pinBtn = e.target.closest('button.pin-btn');
       if (pinBtn && pinBtn.dataset.pin) {
@@ -157,7 +168,7 @@
     },
     error: (err) => {
       console.error('Failed to load CSV:', err);
-      LB.innerHTML = `<tr><td colspan="10">Failed to load data.</td></tr>`;
+      LB.innerHTML = `<tr><td colspan="12">Failed to load data.</td></tr>`;
     }
   });
 })();
