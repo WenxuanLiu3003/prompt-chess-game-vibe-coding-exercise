@@ -121,3 +121,19 @@ h2 { margin: .25rem 0 .75rem; font-size: 1.1rem; }
 }
 .badge.top3 { border-color: var(--hl-top); color: var(--hl-top); }
 .badge.highwr { border-color: var(--hl-win); color: var(--hl-win); }
+
+/* pin column + button */
+.pin-col { width: 44px; text-align: center; }
+.pin-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--card); color: var(--muted);
+  cursor: pointer; font-size: 16px; line-height: 1;
+}
+.pin-btn:hover { background: color-mix(in oklab, var(--card), var(--text) 6%); }
+.pin-btn.active { color: var(--accent); border-color: var(--accent); }
+
+tr.row-pinned {
+  outline: 1px dashed var(--accent);
+  outline-offset: -2px;
+}
