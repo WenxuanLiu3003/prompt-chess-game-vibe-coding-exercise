@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="./styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <!-- YAML parser -->
   <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
 </head>
 <body>
@@ -17,7 +16,7 @@
   <div></div>
 </header>
 
-<main class="container" id="playerContainer">
+<main class="container">
   <section class="card" id="playerCard">
     <h2 id="playerName">Loading…</h2>
     <div class="grid two">
@@ -33,29 +32,20 @@
           <li><span>Win Rate</span><strong id="winrate">–</strong></li>
         </ul>
       </div>
-      <div>
-        <canvas id="playerWDL"></canvas>
-      </div>
+      <div><canvas id="playerWDL"></canvas></div>
     </div>
   </section>
 
-  <!-- NEW: Model & Prompts -->
   <section class="card" id="modelPromptCard">
     <div class="card-header">
       <h2>Model & Prompts</h2>
       <span id="modelBadge" class="badge model">Loading…</span>
     </div>
 
-    <div id="promptBlocks" class="prompt-blocks">
-      <!-- Populated dynamically -->
-    </div>
-
-    <div id="promptMeta" class="prompt-meta">
-      <!-- Optional metadata from YAML -->
-    </div>
-
+    <div id="promptBlocks" class="prompt-blocks"></div>
+    <div id="promptMeta" class="prompt-meta"></div>
     <p id="promptError" class="muted" style="display:none;">
-      Couldn’t find a prompt YAML for this player in <code>data/prompt_collection/</code>.
+      Couldn’t find any YAML containing this player’s name in <code>data/prompt_collection/</code>.
     </p>
   </section>
 </main>
@@ -66,29 +56,22 @@
 
 <script src="./utils.js"></script>
 <script>
-(function () {
+(async function () {
   const params = new URLSearchParams(window.location.search);
   const playerName = params.get('name');
-
   if (!playerName) {
     document.getElementById('playerName').textContent = 'No player specified.';
     return;
   }
 
-  // --- Load standings (CSV) as before ---
+  // ============ Load leaderboard info ============
   Papa.parse('data/final_standings.csv', {
     header: true,
     download: true,
     dynamicTyping: true,
     complete: (res) => {
-      const rows = res.data.filter(Boolean);
-      const row = rows.find(r => String(r.Player) === playerName);
-      if (!row) {
-        document.getElementById('playerName').textContent = 'Player not found.';
-        return;
-      }
-
-      // Fill fields
+      const row = res.data.find(r => String(r.Player) === playerName);
+      if (!row) return;
       document.getElementById('playerName').textContent = row.Player;
       document.getElementById('rank').textContent = row.Rank;
       document.getElementById('mu').textContent = row.Rating_Mu;
@@ -99,185 +82,125 @@
       document.getElementById('losses').textContent = row.Losses;
       document.getElementById('winrate').textContent = formatPercent(row.Win_Rate);
 
-      // Player pie chart
-      const ctx = document.getElementById('playerWDL');
-      new Chart(ctx, {
+      new Chart(document.getElementById('playerWDL'), {
         type: 'pie',
-        data: {
-          labels: ['Wins', 'Draws', 'Losses'],
-          datasets: [{ data: [row.Wins, row.Draws, row.Losses] }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { position: 'bottom' },
-            title: { display: true, text: 'W/D/L Breakdown' }
-          }
-        }
+        data: { labels: ['Wins','Draws','Losses'],
+                datasets:[{ data:[row.Wins,row.Draws,row.Losses] }] },
+        options: { plugins:{legend:{position:'bottom'},
+                            title:{display:true,text:'W/D/L Breakdown'}} }
       });
     }
   });
 
-  // --- Load YAML (model + prompts) ---
+  // ============ Load YAML prompt/model ============
   const modelBadge = document.getElementById('modelBadge');
   const blocks = document.getElementById('promptBlocks');
   const meta = document.getElementById('promptMeta');
   const errEl = document.getElementById('promptError');
 
-  function candidates(name) {
-    const base = 'data/prompt_collection/';
-    const raw = name.trim();
-    const unders = raw.replace(/\s+/g, '_');
-    const clean = raw.replace(/[^A-Za-z0-9_\- ]/g, '');
-    const lower = raw.toLowerCase();
-    const lowerUnders = unders.toLowerCase();
-    return [
-      `${base}${raw}.yml`, `${base}${raw}.yaml`,
-      `${base}${unders}.yml`, `${base}${unders}.yaml`,
-      `${base}${clean}.yml`, `${base}${clean}.yaml`,
-      `${base}${lower}.yml`, `${base}${lower}.yaml`,
-      `${base}${lowerUnders}.yml`, `${base}${lowerUnders}.yaml`,
-    ];
+  function escapeHTML(s){
+    return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function addBlock(title,content){
+    const el=document.createElement('section');
+    el.className='prompt-block';
+    el.innerHTML=`<div class="prompt-block-title">${title}</div>
+      <pre class="prompt-pre"><code>${escapeHTML(String(content))}</code></pre>`;
+    blocks.appendChild(el);
+  }
+  function addMessages(messages){
+    const sec=document.createElement('section');sec.className='prompt-block';
+    sec.innerHTML='<div class="prompt-block-title">Messages</div>';
+    const list=document.createElement('div');list.className='msg-list';
+    messages.forEach(m=>{
+      const role=m.role||m.speaker||'message',text=m.content??m.text??'';
+      const div=document.createElement('div');div.className='msg';
+      div.innerHTML=`<div class="msg-role">${escapeHTML(role)}</div>
+                     <div class="msg-content"><pre><code>${escapeHTML(String(text))}</code></pre></div>`;
+      list.appendChild(div);
+    });
+    sec.appendChild(list);blocks.appendChild(sec);
   }
 
-  async function loadYamlForPlayer(name) {
-    const files = candidates(name);
-    for (const url of files) {
-      try {
-        const r = await fetch(url, { cache: 'no-store' });
-        if (r.ok) {
-          const text = await r.text();
-          return { url, data: jsyaml.load(text) };
-        }
-      } catch (e) {
-        // continue trying next candidate
-      }
-    }
-    return null;
-  }
-
-  function pickModel(y) {
-    // Try a few common places/keys
-    const direct = y.model || y.model_name || y.engine || y.backend || y.provider;
-    if (typeof direct === 'string') return direct;
-
-    // nested patterns: config.model, openai.model, model.name, etc.
-    const paths = [
-      ['config', 'model'], ['openai', 'model'], ['api', 'model'],
-      ['backend', 'model'], ['model', 'name']
-    ];
-    for (const p of paths) {
-      let node = y;
-      for (const k of p) node = node?.[k];
-      if (typeof node === 'string') return node;
+  function pickModel(y){
+    const direct=y.model||y.model_name||y.engine||y.backend||y.provider;
+    if(typeof direct==='string') return direct;
+    const paths=[['config','model'],['openai','model'],['api','model'],['model','name']];
+    for(const p of paths){
+      let node=y;for(const k of p) node=node?.[k];
+      if(typeof node==='string') return node;
     }
     return 'Unknown model';
   }
 
-  function addBlock(title, content) {
-    const section = document.createElement('section');
-    section.className = 'prompt-block';
-    section.innerHTML = `
-      <div class="prompt-block-title">${title}</div>
-      <pre class="prompt-pre"><code>${escapeHTML(String(content))}</code></pre>
-    `;
-    blocks.appendChild(section);
+  // Fuzzy filename search: fetch directory listing and find YAML whose name contains playerName
+  async function findYamlFuzzy() {
+    try {
+      // Use GitHub raw directory API (works when served as GitHub Pages static)
+      const listingUrl = 'data/prompt_collection/';
+      const indexGuess = `${listingUrl}index.json`;
+      // Try to read index.json (if exists) for speed
+      const r = await fetch(indexGuess);
+      if (r.ok) {
+        const files = await r.json();
+        const f = files.find(fn => fn.toLowerCase().includes(playerName.toLowerCase()) &&
+                                   (fn.endsWith('.yml') || fn.endsWith('.yaml')));
+        if (f) return `${listingUrl}${f}`;
+      }
+    } catch(e){/* ignore */}
+    // fallback: try brute-force common endings
+    const base='data/prompt_collection/';
+    const lower=playerName.toLowerCase().replace(/\s+/g,'');
+    const guesses=['.yml','.yaml'];
+    for (const ext of guesses){
+      const resp=await fetch(`${base}${playerName}${ext}`);
+      if(resp.ok) return `${base}${playerName}${ext}`;
+      const resp2=await fetch(`${base}${playerName.replace(/\s+/g,'_')}${ext}`);
+      if(resp2.ok) return `${base}${playerName.replace(/\s+/g,'_')}${ext}`;
+    }
+    // last resort: try to scan likely numbered files
+    // This generic fuzzy fallback is static-site safe: pre-known list could be inserted later.
+    const pre = ['GPT4','GPT35','Claude','Gemini','OpenAI','Prompt','Chat'];
+    for(const kw of pre){
+      const test=`${base}${kw}_${playerName}.yml`;
+      try{const r=await fetch(test);if(r.ok)return test;}catch(e){}
+    }
+    return null;
   }
 
-  function addMessages(messages) {
-    const section = document.createElement('section');
-    section.className = 'prompt-block';
-    section.innerHTML = `<div class="prompt-block-title">Messages</div>`;
-    const list = document.createElement('div');
-    list.className = 'msg-list';
-    messages.forEach(m => {
-      const role = m.role || m.speaker || 'message';
-      const text = m.content ?? m.text ?? '';
-      const item = document.createElement('div');
-      item.className = 'msg';
-      item.innerHTML = `<div class="msg-role">${escapeHTML(role)}</div>
-                        <div class="msg-content"><pre><code>${escapeHTML(String(text))}</code></pre></div>`;
-      list.appendChild(item);
-    });
-    section.appendChild(list);
-    blocks.appendChild(section);
+  async function loadYamlFile() {
+    const ymlPath = await findYamlFuzzy();
+    if (!ymlPath) return null;
+    try {
+      const text = await fetch(ymlPath).then(r=>r.text());
+      return { path: ymlPath, data: jsyaml.load(text) };
+    } catch { return null; }
   }
 
-  function addMeta(y) {
-    const knownKeys = ['temperature','top_p','seed','max_tokens','stop','tools','tool_choice'];
-    const kv = [];
-    knownKeys.forEach(k => {
-      const v = y[k] ?? y?.config?.[k] ?? y?.params?.[k];
-      if (v !== undefined && v !== null) kv.push([k, typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v)]);
-    });
-    if (kv.length) {
-      const dl = document.createElement('dl');
-      dl.className = 'meta-kv';
-      kv.forEach(([k,v]) => {
-        const dt = document.createElement('dt'); dt.textContent = k;
-        const dd = document.createElement('dd'); dd.textContent = v;
-        dl.appendChild(dt); dl.appendChild(dd);
-      });
-      const hdr = document.createElement('div');
-      hdr.className = 'prompt-block-title';
-      hdr.textContent = 'YAML Parameters';
-      meta.appendChild(hdr);
-      meta.appendChild(dl);
-    }
-  }
+  modelBadge.textContent='Loading…';
+  const result = await loadYamlFile();
+  if (!result) { modelBadge.textContent='No YAML'; errEl.style.display=''; return; }
 
-  function escapeHTML(s) {
-    return s.replace(/[&<>"']/g, c => ({
-      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-    }[c]));
-  }
+  const y=result.data||{};
+  modelBadge.textContent=pickModel(y);
 
-  (async () => {
-    modelBadge.textContent = 'Loading…';
-    const result = await loadYamlForPlayer(playerName);
-    if (!result) {
-      modelBadge.textContent = 'No YAML';
-      errEl.style.display = '';
-      return;
-    }
+  if (typeof y.prompt==='string') addBlock('Prompt',y.prompt);
+  if (typeof y.system_prompt==='string') addBlock('System Prompt',y.system_prompt);
+  if (typeof y.user_prompt==='string') addBlock('User Prompt',y.user_prompt);
+  if (typeof y.instructions==='string') addBlock('Instructions',y.instructions);
+  if (Array.isArray(y.prompts)) y.prompts.forEach((p,i)=>addBlock(`Prompt ${i+1}`,typeof p==='string'?p:JSON.stringify(p,null,2)));
+  if (Array.isArray(y.messages)) addMessages(y.messages);
+  if (Array.isArray(y.chat)) addMessages(y.chat);
 
-    const y = result.data || {};
-    modelBadge.textContent = pickModel(y);
-
-    // Prompts: try common fields
-    // Single prompt strings
-    if (typeof y.prompt === 'string') addBlock('Prompt', y.prompt);
-    if (typeof y.system_prompt === 'string') addBlock('System Prompt', y.system_prompt);
-    if (typeof y.user_prompt === 'string') addBlock('User Prompt', y.user_prompt);
-    if (typeof y.instructions === 'string') addBlock('Instructions', y.instructions);
-
-    // Arrays / message style
-    if (Array.isArray(y.prompts)) {
-      y.prompts.forEach((p, i) => addBlock(`Prompt ${i+1}`, typeof p === 'string' ? p : JSON.stringify(p, null, 2)));
-    }
-    if (Array.isArray(y.messages)) {
-      addMessages(y.messages);
-    } else if (Array.isArray(y.chat) && y.chat.every(m => typeof m === 'object')) {
-      addMessages(y.chat);
-    }
-
-    // Any leftover big text fields: show generically (avoids hiding useful content)
-    const textish = Object.entries(y).filter(([k,v]) =>
-      typeof v === 'string' && /prompt|instruction|template|system/i.test(k)
-    );
-    textish.forEach(([k,v]) => addBlock(k, v));
-
-    // Meta knobs if present
-    addMeta(y);
-
-    // If nothing showed, tell the user
-    if (!blocks.children.length) {
-      const empty = document.createElement('p');
-      empty.className = 'muted';
-      empty.textContent = 'No prompt fields found in YAML.';
-      blocks.appendChild(empty);
-    }
-  })();
+  // small meta parameters
+  const metaKeys=['temperature','top_p','seed','max_tokens','stop'];
+  const dl=document.createElement('dl');dl.className='meta-kv';
+  metaKeys.forEach(k=>{
+    const v=y[k]??y?.config?.[k]??y?.params?.[k];
+    if(v!==undefined){const dt=document.createElement('dt');dt.textContent=k;
+      const dd=document.createElement('dd');dd.textContent=String(v);dl.append(dt,dd);}
+  });
+  if(dl.children.length){meta.append(dl);}
 })();
 </script>
 </body>
