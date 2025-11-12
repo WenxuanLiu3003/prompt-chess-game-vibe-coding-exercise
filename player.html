@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Player Details — Prompt Game Tournament</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<header class="site-header">
+  <a class="btn link" href="./index.html">← Back</a>
+  <h1>Player Details</h1>
+  <div></div>
+</header>
+
+<main class="container" id="playerContainer">
+  <section class="card" id="playerCard">
+    <h2 id="playerName">Loading…</h2>
+    <div class="grid two">
+      <div>
+        <ul class="kv">
+          <li><span>Rank</span><strong id="rank">–</strong></li>
+          <li><span>Rating μ</span><strong id="mu">–</strong></li>
+          <li><span>Rating σ</span><strong id="sigma">–</strong></li>
+          <li><span>Games</span><strong id="games">–</strong></li>
+          <li><span>Wins</span><strong id="wins">–</strong></li>
+          <li><span>Draws</span><strong id="draws">–</strong></li>
+          <li><span>Losses</span><strong id="losses">–</strong></li>
+          <li><span>Win Rate</span><strong id="winrate">–</strong></li>
+        </ul>
+      </div>
+      <div>
+        <canvas id="playerWDL"></canvas>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <p><code>data/final_standings.csv</code></p>
+</footer>
+
+<script src="./utils.js"></script>
+<script>
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const playerName = params.get('name');
+
+  if (!playerName) {
+    document.getElementById('playerName').textContent = 'No player specified.';
+    return;
+  }
+
+  Papa.parse('data/final_standings.csv', {
+    header: true,
+    download: true,
+    dynamicTyping: true,
+    complete: (res) => {
+      const rows = res.data.filter(Boolean);
+      const row = rows.find(r => String(r.Player) === playerName);
+      if (!row) {
+        document.getElementById('playerName').textContent = 'Player not found.';
+        return;
+      }
+
+      // Fill fields
+      document.getElementById('playerName').textContent = row.Player;
+      document.getElementById('rank').textContent = row.Rank;
+      document.getElementById('mu').textContent = row.Rating_Mu;
+      document.getElementById('sigma').textContent = row.Rating_Sigma;
+      document.getElementById('games').textContent = row.Games;
+      document.getElementById('wins').textContent = row.Wins;
+      document.getElementById('draws').textContent = row.Draws;
+      document.getElementById('losses').textContent = row.Losses;
+      document.getElementById('winrate').textContent = formatPercent(row.Win_Rate);
+
+      // Player pie chart
+      const ctx = document.getElementById('playerWDL');
+      new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: ['Wins', 'Draws', 'Losses'],
+          datasets: [{
+            data: [row.Wins, row.Draws, row.Losses]
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'bottom' },
+            title: { display: true, text: 'W/D/L Breakdown' }
+          }
+        }
+      });
+    }
+  });
+})();
+</script>
+</body>
+</html>
