@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="./styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- YAML parser -->
+  <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
 </head>
 <body>
 <header class="site-header">
@@ -36,10 +38,30 @@
       </div>
     </div>
   </section>
+
+  <!-- NEW: Model & Prompts -->
+  <section class="card" id="modelPromptCard">
+    <div class="card-header">
+      <h2>Model & Prompts</h2>
+      <span id="modelBadge" class="badge model">Loading…</span>
+    </div>
+
+    <div id="promptBlocks" class="prompt-blocks">
+      <!-- Populated dynamically -->
+    </div>
+
+    <div id="promptMeta" class="prompt-meta">
+      <!-- Optional metadata from YAML -->
+    </div>
+
+    <p id="promptError" class="muted" style="display:none;">
+      Couldn’t find a prompt YAML for this player in <code>data/prompt_collection/</code>.
+    </p>
+  </section>
 </main>
 
 <footer class="site-footer">
-  <p><code>data/final_standings.csv</code></p>
+  <p><code>data/final_standings.csv</code> • <code>data/prompt_collection/*.yml</code></p>
 </footer>
 
 <script src="./utils.js"></script>
@@ -53,6 +75,7 @@
     return;
   }
 
+  // --- Load standings (CSV) as before ---
   Papa.parse('data/final_standings.csv', {
     header: true,
     download: true,
@@ -82,9 +105,7 @@
         type: 'pie',
         data: {
           labels: ['Wins', 'Draws', 'Losses'],
-          datasets: [{
-            data: [row.Wins, row.Draws, row.Losses]
-          }]
+          datasets: [{ data: [row.Wins, row.Draws, row.Losses] }]
         },
         options: {
           responsive: true,
@@ -96,6 +117,167 @@
       });
     }
   });
+
+  // --- Load YAML (model + prompts) ---
+  const modelBadge = document.getElementById('modelBadge');
+  const blocks = document.getElementById('promptBlocks');
+  const meta = document.getElementById('promptMeta');
+  const errEl = document.getElementById('promptError');
+
+  function candidates(name) {
+    const base = 'data/prompt_collection/';
+    const raw = name.trim();
+    const unders = raw.replace(/\s+/g, '_');
+    const clean = raw.replace(/[^A-Za-z0-9_\- ]/g, '');
+    const lower = raw.toLowerCase();
+    const lowerUnders = unders.toLowerCase();
+    return [
+      `${base}${raw}.yml`, `${base}${raw}.yaml`,
+      `${base}${unders}.yml`, `${base}${unders}.yaml`,
+      `${base}${clean}.yml`, `${base}${clean}.yaml`,
+      `${base}${lower}.yml`, `${base}${lower}.yaml`,
+      `${base}${lowerUnders}.yml`, `${base}${lowerUnders}.yaml`,
+    ];
+  }
+
+  async function loadYamlForPlayer(name) {
+    const files = candidates(name);
+    for (const url of files) {
+      try {
+        const r = await fetch(url, { cache: 'no-store' });
+        if (r.ok) {
+          const text = await r.text();
+          return { url, data: jsyaml.load(text) };
+        }
+      } catch (e) {
+        // continue trying next candidate
+      }
+    }
+    return null;
+  }
+
+  function pickModel(y) {
+    // Try a few common places/keys
+    const direct = y.model || y.model_name || y.engine || y.backend || y.provider;
+    if (typeof direct === 'string') return direct;
+
+    // nested patterns: config.model, openai.model, model.name, etc.
+    const paths = [
+      ['config', 'model'], ['openai', 'model'], ['api', 'model'],
+      ['backend', 'model'], ['model', 'name']
+    ];
+    for (const p of paths) {
+      let node = y;
+      for (const k of p) node = node?.[k];
+      if (typeof node === 'string') return node;
+    }
+    return 'Unknown model';
+  }
+
+  function addBlock(title, content) {
+    const section = document.createElement('section');
+    section.className = 'prompt-block';
+    section.innerHTML = `
+      <div class="prompt-block-title">${title}</div>
+      <pre class="prompt-pre"><code>${escapeHTML(String(content))}</code></pre>
+    `;
+    blocks.appendChild(section);
+  }
+
+  function addMessages(messages) {
+    const section = document.createElement('section');
+    section.className = 'prompt-block';
+    section.innerHTML = `<div class="prompt-block-title">Messages</div>`;
+    const list = document.createElement('div');
+    list.className = 'msg-list';
+    messages.forEach(m => {
+      const role = m.role || m.speaker || 'message';
+      const text = m.content ?? m.text ?? '';
+      const item = document.createElement('div');
+      item.className = 'msg';
+      item.innerHTML = `<div class="msg-role">${escapeHTML(role)}</div>
+                        <div class="msg-content"><pre><code>${escapeHTML(String(text))}</code></pre></div>`;
+      list.appendChild(item);
+    });
+    section.appendChild(list);
+    blocks.appendChild(section);
+  }
+
+  function addMeta(y) {
+    const knownKeys = ['temperature','top_p','seed','max_tokens','stop','tools','tool_choice'];
+    const kv = [];
+    knownKeys.forEach(k => {
+      const v = y[k] ?? y?.config?.[k] ?? y?.params?.[k];
+      if (v !== undefined && v !== null) kv.push([k, typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v)]);
+    });
+    if (kv.length) {
+      const dl = document.createElement('dl');
+      dl.className = 'meta-kv';
+      kv.forEach(([k,v]) => {
+        const dt = document.createElement('dt'); dt.textContent = k;
+        const dd = document.createElement('dd'); dd.textContent = v;
+        dl.appendChild(dt); dl.appendChild(dd);
+      });
+      const hdr = document.createElement('div');
+      hdr.className = 'prompt-block-title';
+      hdr.textContent = 'YAML Parameters';
+      meta.appendChild(hdr);
+      meta.appendChild(dl);
+    }
+  }
+
+  function escapeHTML(s) {
+    return s.replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  (async () => {
+    modelBadge.textContent = 'Loading…';
+    const result = await loadYamlForPlayer(playerName);
+    if (!result) {
+      modelBadge.textContent = 'No YAML';
+      errEl.style.display = '';
+      return;
+    }
+
+    const y = result.data || {};
+    modelBadge.textContent = pickModel(y);
+
+    // Prompts: try common fields
+    // Single prompt strings
+    if (typeof y.prompt === 'string') addBlock('Prompt', y.prompt);
+    if (typeof y.system_prompt === 'string') addBlock('System Prompt', y.system_prompt);
+    if (typeof y.user_prompt === 'string') addBlock('User Prompt', y.user_prompt);
+    if (typeof y.instructions === 'string') addBlock('Instructions', y.instructions);
+
+    // Arrays / message style
+    if (Array.isArray(y.prompts)) {
+      y.prompts.forEach((p, i) => addBlock(`Prompt ${i+1}`, typeof p === 'string' ? p : JSON.stringify(p, null, 2)));
+    }
+    if (Array.isArray(y.messages)) {
+      addMessages(y.messages);
+    } else if (Array.isArray(y.chat) && y.chat.every(m => typeof m === 'object')) {
+      addMessages(y.chat);
+    }
+
+    // Any leftover big text fields: show generically (avoids hiding useful content)
+    const textish = Object.entries(y).filter(([k,v]) =>
+      typeof v === 'string' && /prompt|instruction|template|system/i.test(k)
+    );
+    textish.forEach(([k,v]) => addBlock(k, v));
+
+    // Meta knobs if present
+    addMeta(y);
+
+    // If nothing showed, tell the user
+    if (!blocks.children.length) {
+      const empty = document.createElement('p');
+      empty.className = 'muted';
+      empty.textContent = 'No prompt fields found in YAML.';
+      blocks.appendChild(empty);
+    }
+  })();
 })();
 </script>
 </body>
