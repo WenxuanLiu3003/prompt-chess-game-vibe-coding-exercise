@@ -6,14 +6,37 @@
   let allRows = [];
   let charts = { win: null, mu: null, wdl: null };
 
+  function rowFlags(r) {
+    const rank = Number(r.Rank);
+    const wr = (r.Win_Rate > 1 ? r.Win_Rate / 100 : r.Win_Rate); // normalize if 0..100
+    const isTop3 = Number.isFinite(rank) && rank >= 1 && rank <= 3;
+    const isHighWR = Number.isFinite(wr) && wr >= 0.80;
+    return { isTop3, isHighWR };
+  }
+
   function renderTable(rows) {
     LB.innerHTML = '';
     const frag = document.createDocumentFragment();
     rows.forEach(r => {
+      const { isTop3, isHighWR } = rowFlags(r);
+
+      const classes = [
+        isTop3 ? 'row-hl-top' : '',
+        isHighWR ? 'row-hl-win' : ''
+      ].filter(Boolean).join(' ');
+
+      const badges = [];
+      if (isTop3)  badges.push('<span class="badge top3" title="Top 3">Top 3</span>');
+      if (isHighWR) badges.push('<span class="badge highwr" title="Win Rate ≥ 80%">80%+</span>');
+
       const tr = document.createElement('tr');
+      tr.className = classes;
       tr.innerHTML = `
         <td>${r.Rank}</td>
-        <td><a class="btn link" href="#" data-player="${r.Player}">${r.Player}</a></td>
+        <td>
+          <a class="btn link" href="#" data-player="${r.Player}">${r.Player}</a>
+          ${badges.length ? `<span class="badges">${badges.join('')}</span>` : ''}
+        </td>
         <td>${r.Rating_Mu}</td>
         <td>${r.Rating_Sigma}</td>
         <td>${r.Wins}</td>
@@ -35,7 +58,6 @@
   }
 
   function updateCharts(rows) {
-    // destroy existing
     charts.win?.destroy(); charts.mu?.destroy(); charts.wdl?.destroy();
     charts.win = buildWinRateBar(document.getElementById('winRateChart'), rows);
     charts.mu  = buildRatingDist (document.getElementById('ratingDistChart'), rows);
